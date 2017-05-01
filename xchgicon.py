@@ -1,34 +1,66 @@
 #!/usr/bin/python
+#
+# xchgicon.py: Notification icon for unread Exchange emails
+
 import time
-from exchangelib import DELEGATE, Account, Credentials, Configuration
+import pygtk
+import glib
+import gtk
+import exchangelib
+import sys
+
+if len(sys.argv) != 3:
+    print "Usage: %s <username> <password>"%sys.argv[0]
+    sys.exit(1)
 
 CHECK_INTERVAL_MINS = 2
-USERNAME = "user@domain.tld"
-PASSWORD = "password"
-SERVER = "outlook.com"
+username = sys.argv[1]
+password = sys.argv[2]
+server = "outlook.com"
 
 def connect_to_exchange():
-    credentials = Credentials(username=USERNAME,
-                              password=PASSWORD)
-    config = Configuration(server=SERVER, credentials = credentials)
-    account = Account(primary_smtp_address=USERNAME,
-                      config=config,
-                      autodiscover=False,
-                      access_type=DELEGATE)
+    # See https://github.com/ecederstrand/exchangelib for documentation on
+    # exchangelib.
+    credentials = exchangelib.Credentials(username=username,
+                                          password=password)
+    config = exchangelib.Configuration(server=server,
+                                       credentials = credentials)
+    account = exchangelib.Account(primary_smtp_address=username,
+                                  config=config,
+                                  autodiscover=False,
+                                  access_type=exchangelib.DELEGATE)
     return account
 
+def menu_quit_callback(data=None):
+    gtk.main_quit()
+
+def show_menu(event_button, event_time, data=None):
+    menu = gtk.Menu()
+    menu_quit = gtk.MenuItem("Quit")
+    menu.append(menu_quit)
+    menu_quit.connect_object("activate", menu_quit_callback, "Quit")
+    menu_quit.show()
+    menu.popup(None, None, None, event_button, event_time)
+
+def on_right_click(data, event_button, event_time):
+    show_menu(event_button, event_time)
+
 def set_icon_notify(notify):
-    print notify
+    global trayicon
+    if notify:
+        trayicon.set_from_icon_name("indicator-messages-new")
+    else:
+        trayicon.set_from_icon_name("indicator-messages")
 
-old_unread = None
-notifying = False
-quitting = False
-account = connect_to_exchange()
+def perform_check(data):
+    global notifying
+    global old_unread
 
-while not quitting:
     account.inbox.refresh()
     unread = account.inbox.unread_count
 
+    # Say that we need to notify for "new" unread messages if the count goes
+    # up, and that we can clear the notification if the count goes down.
     if old_unread == None:
         notifying = False
     elif notifying:
@@ -36,6 +68,23 @@ while not quitting:
     else:
         notifying = old_unread < unread
 
+    #print "DEBUG: %s -> %s so notifying := %s"%(old_unread, unread, notifying)
+
     set_icon_notify(notifying)
     old_unread = unread
-    time.sleep(CHECK_INTERVAL_MINS * 60)
+
+    return True
+
+old_unread = None
+notifying = False
+account = connect_to_exchange()
+
+trayicon = gtk.status_icon_new_from_icon_name("indicator-messages")
+trayicon.connect('popup-menu', on_right_click)
+
+# Perform the check now and at regular intervals thereafter
+perform_check(None)
+glib.timeout_add_seconds(CHECK_INTERVAL_MINS * 60, perform_check, None)
+
+gtk.main()
+sys.exit(0)
