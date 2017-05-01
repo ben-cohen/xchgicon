@@ -1,0 +1,4 @@
+Quick and dirty Python script to check an Exchange/Office365 inbox and
+display a system tray icon that indicates if there are new unread messages.
+
+Dependencies: exchangelib, pygtk
