@@ -31,24 +31,33 @@ def connect_to_exchange():
                                   access_type=exchangelib.DELEGATE)
     return account
 
-def menu_toggle_notify_callback(data):
+def toggle_notify_callback(data):
     global notifying
     notifying = not notifying
     set_icon_notify(notifying)
 
-def menu_quit_callback(data=None):
+def quit_callback(data):
     gtk.main_quit()
+
+def notify_only_new_callback(checkmenuitem):
+    global notify_only_new
+    notify_only_new = not notify_only_new
+    checkmenuitem.set_active(notify_only_new)
 
 def show_menu(event_button, event_time, data=None):
     menu = gtk.Menu()
     menu_toggle_notify = gtk.MenuItem("Toggle notification")
+    menu_notify_only_new = gtk.CheckMenuItem("Notify only new messages")
+    menu_notify_only_new.set_active(notify_only_new)
     menu_quit = gtk.MenuItem("Quit")
     menu.append(menu_toggle_notify)
+    menu.append(menu_notify_only_new)
     menu.append(menu_quit)
-    menu_toggle_notify.connect_object("activate",
-                                      menu_toggle_notify_callback,
-                                      "Toggle notification")
-    menu_quit.connect_object("activate", menu_quit_callback, "Quit")
+    menu_notify_only_new.connect_object("toggled", notify_only_new_callback,
+                                        menu_notify_only_new)
+    menu_toggle_notify.connect_object("activate", toggle_notify_callback, None)
+    menu_quit.connect_object("activate", quit_callback, None)
+    menu_notify_only_new.show()
     menu_toggle_notify.show()
     menu_quit.show()
     menu.popup(None, None, None, event_button, event_time)
@@ -70,14 +79,18 @@ def perform_check(data):
     account.inbox.refresh()
     unread = account.inbox.unread_count
 
-    # Say that we need to notify for "new" unread messages if the count goes
-    # up, and that we can clear the notification if the count goes down.
-    if old_unread == None:
-        notifying = False
-    elif notifying:
-        notifying = old_unread <= unread
+    if not notify_only_new:
+        # Notify if there are any unread messages.
+        notifying = unread > 0
     else:
-        notifying = old_unread < unread
+        # Notify for "new" unread messages if the count goes up, and clear the
+        # notification if the count goes down.
+        if old_unread == None:
+            notifying = False
+        elif notifying:
+            notifying = old_unread <= unread
+        else:
+            notifying = old_unread < unread
 
     #print "DEBUG: %s -> %s so notifying := %s"%(old_unread, unread, notifying)
 
@@ -86,6 +99,7 @@ def perform_check(data):
 
     return True
 
+notify_only_new = True
 old_unread = None
 notifying = False
 account = connect_to_exchange()
