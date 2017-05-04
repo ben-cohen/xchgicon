@@ -31,14 +31,25 @@ def connect_to_exchange():
                                   access_type=exchangelib.DELEGATE)
     return account
 
+def menu_toggle_notify_callback(data):
+    global notifying
+    notifying = not notifying
+    set_icon_notify(notifying)
+
 def menu_quit_callback(data=None):
     gtk.main_quit()
 
 def show_menu(event_button, event_time, data=None):
     menu = gtk.Menu()
+    menu_toggle_notify = gtk.MenuItem("Toggle notification")
     menu_quit = gtk.MenuItem("Quit")
+    menu.append(menu_toggle_notify)
     menu.append(menu_quit)
+    menu_toggle_notify.connect_object("activate",
+                                      menu_toggle_notify_callback,
+                                      "Toggle notification")
     menu_quit.connect_object("activate", menu_quit_callback, "Quit")
+    menu_toggle_notify.show()
     menu_quit.show()
     menu.popup(None, None, None, event_button, event_time)
 
