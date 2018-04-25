@@ -7,16 +7,40 @@ import pygtk
 import glib
 import gtk
 import exchangelib
+import os
 import sys
 
-if len(sys.argv) != 3:
-    print "Usage: %s <username> <password>"%sys.argv[0]
+password_dialog_cancel = False
+progname = os.path.basename(sys.argv[0])
+
+if len(sys.argv) not in [2, 3]:
+    print "Usage: %s <username> [<password>]"%sys.argv[0]
     sys.exit(1)
 
-CHECK_INTERVAL_MINS = 2
-username = sys.argv[1]
-password = sys.argv[2]
-server = "outlook.com"
+def prompt_for_password(username):
+    def entry_handle_enter(entry, dialog, response):
+        dialog.response(response)
+
+    dialog = gtk.MessageDialog(None,
+                               gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+                               gtk.MESSAGE_QUESTION,
+                               gtk.BUTTONS_OK,
+                               None)
+    dialog.set_markup("%s: Enter the password for %s"%(progname, username))
+    entry = gtk.Entry()
+    entry.set_visibility(False)
+    entry.set_invisible_char("*")
+    entry.connect("activate", entry_handle_enter, dialog, gtk.RESPONSE_OK)
+    hbox = gtk.HBox()
+    hbox.pack_start(gtk.Label("Password:"), False, 5, 5)
+    hbox.pack_end(entry)
+    dialog.vbox.pack_end(hbox, True, True, 0)
+    dialog.show_all()
+    dialog.run()
+    text = entry.get_text()
+    dialog.destroy()
+    gtk.gdk.flush()
+    return text
 
 def connect_to_exchange():
     # See https://github.com/ecederstrand/exchangelib for documentation on
@@ -98,6 +122,18 @@ def perform_check(data):
     old_unread = unread
 
     return True
+
+# XXX Have a menu option to input these
+CHECK_INTERVAL_MINS = 2
+
+# XXX Input these at startup (or config file)
+server = "outlook.com"
+username = sys.argv[1]
+
+if len(sys.argv) == 3:
+    password = sys.argv[2]
+else:
+    password = prompt_for_password(username)
 
 notify_only_new = True
 old_unread = None
